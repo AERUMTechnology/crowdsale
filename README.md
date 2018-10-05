@@ -1,2 +1,2 @@
-# crowdsale
+# Aerum crowdsale
 Aerum crowdsale contract
