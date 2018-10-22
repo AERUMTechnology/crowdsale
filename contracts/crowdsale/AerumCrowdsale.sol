@@ -23,17 +23,15 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
     /**
      * @dev pledgeTotal Total pledge collected from all investors
      * @dev pledgeClosingTime Time when pledge is closed & it's not possible to pledge more or use pledge more
-     * @dev pledgePercentage Percentage which is required to invest to pledge some tokens amount
      * @dev pledges Mapping of all pledges done by investors
      */
     uint256 public pledgeTotal;
     uint256 public pledgeClosingTime;
-    uint256 public pledgePercentage;
     mapping (address => uint256) public pledges;
 
     /**
-     * @dev whitelistedRate Rate which is used while whitelisted sale
-     * @dev publicRate Rate which is used white public crowdsale
+     * @dev whitelistedRate Rate which is used while whitelisted sale (XRM to ETH)
+     * @dev publicRate Rate which is used white public crowdsale (XRM to ETH)
      */
     uint256 public whitelistedRate;
     uint256 public publicRate;
@@ -51,7 +49,7 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
      * @param _openingTime Crowdsale open time
      * @param _closingTime Crowdsale close time
      * @param _pledgeClosingTime Time when pledge is closed & no more active
-     * @param _pledgePercentage Percentage of pledge which should be invested to make it active
+\\
      * @param _kycAmountInUsd Amount on which KYC will be required in cents
      * @param _etherPriceInUsd ETH price in cents
      */
@@ -59,7 +57,7 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
         ERC20 _token, address _wallet,
         uint256 _whitelistedRate, uint256 _publicRate,
         uint256 _openingTime, uint256 _closingTime,
-        uint256 _pledgeClosingTime, uint256 _pledgePercentage,
+        uint256 _pledgeClosingTime,
         uint256 _kycAmountInUsd, uint256 _etherPriceInUsd)
     Oraclized(msg.sender)
     Crowdsale(_whitelistedRate, _wallet, _token)
@@ -69,7 +67,6 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
     public {
         require(_openingTime < _pledgeClosingTime && _pledgeClosingTime < _closingTime);
         pledgeClosingTime = _pledgeClosingTime;
-        pledgePercentage = _pledgePercentage;
 
         whitelistedRate = _whitelistedRate;
         publicRate = _publicRate;
@@ -108,8 +105,8 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
 
     /**
      * @dev Update rates
-     * @param _whitelistedRate Rate which is used while whitelisted sale
-     * @param _publicRate Rate which is used white public crowdsale
+     * @param _whitelistedRate Rate which is used while whitelisted sale (XRM to ETH)
+     * @param _publicRate Rate which is used white public crowdsale (XRM to ETH)
      */
     function setRate(uint256 _whitelistedRate, uint256 _publicRate) public onlyOwnerOrOracle {
         require(_whitelistedRate > 0);
@@ -138,7 +135,7 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
      * @param _amount Amount to send
      */
     function sendTokens(address _to, uint256 _amount) external onlyOwner {
-        if (!hasClosed() || goalReached) {
+        if (!isFinalized || goalReached) {
             // NOTE: if crowdsale not finished or successful we should keep at least tokens sold
             _ensureTokensAvailable(_amount);
         }
@@ -174,6 +171,13 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
     }
 
     /**
+     * @dev Returns remaining tokens based on stage
+     */
+    function tokensRemaining() public view returns(uint256) {
+        return token.balanceOf(this).sub(_tokensLocked());
+    }
+
+    /**
      * @dev Override. Withdraw tokens only after crowdsale ends.
      * Adding withdraw event
      */
@@ -191,24 +195,19 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
      *      - check if pledges amount are not more than total coins (in case of pledge period)
      */
     function _preValidatePurchase(address _beneficiary, uint256 _weiAmount) internal {
-        require(_weiToUsd(_weiAmount) >= minInvestmentInUsd);
-        _ensureTokensAvailable(_getTokenAmount(_weiAmount));
-
         super._preValidatePurchase(_beneficiary, _weiAmount);
+
+        require(_totalInvestmentInUsd(_beneficiary, _weiAmount) >= minInvestmentInUsd);
+        _ensureTokensAvailable(_getTokenAmount(_weiAmount));
     }
 
     /**
-     * @dev Ensure amount of tokens you would like to buy or pledge is available
-     * @param _tokens Amount of tokens to buy or pledge
+     * @dev Returns total investment of beneficiary including current one in cents
+     * @param _beneficiary Address to check
+     * @param _weiAmount Current amount being invested in wei
      */
-    function _ensureTokensAvailable(uint256 _tokens) internal {
-        uint256 tokensRequired = _tokens.add(tokensSold);
-
-        if (pledgeOpen()) {
-            tokensRequired = tokensRequired.add(pledgeTotal);
-        }
-
-        require(tokensRequired <= token.balanceOf(this));
+    function _totalInvestmentInUsd(address _beneficiary, uint256 _weiAmount) internal view returns(uint256) {
+        return usdInvested[_beneficiary].add(_weiToUsd(_weiAmount));
     }
 
     /**
@@ -247,6 +246,9 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
         return _weiAmount.mul(currentRate);
     }
 
+    /**
+     * @dev Returns current XRM to ETH rate based on stage
+     */
     function getCurrentRate() public view returns (uint256) {
         if (pledgeOpen()) {
             return whitelistedRate;
@@ -255,18 +257,10 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
     }
 
     /**
-     * @dev Set pledge percentage required to activate it
-     * @param _percentage Required pledge percentage (no decimals)
-     */
-    function setPledgePercentage(uint256 _percentage) external onlyOwnerOrOracle {
-        pledgePercentage = _percentage;
-    }
-
-    /**
      * @dev Check if pledge period is still open
      */
     function pledgeOpen() public view returns (bool) {
-        return block.timestamp <= pledgeClosingTime;
+        return (openingTime <= block.timestamp) && (block.timestamp <= pledgeClosingTime);
     }
 
     /**
@@ -274,27 +268,6 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
      */
     function pledgeOf(address _address) public view returns (uint256) {
         return pledges[_address];
-    }
-
-    /**
-     * @dev Pledge tokens while whitelisted round.
-     * Account should have at least pledgePercentage % of tokens bought or buy with this method.
-     * @param _amount Amount of tokens to pledge
-     */
-    function pledge(uint256 _amount) external payable {
-        require(pledgeOpen());
-        _ensureTokensAvailable(_amount.add(_getTokenAmount(msg.value)));
-
-        uint256 originalPledge = pledges[msg.sender];
-
-        if (msg.value > 0) {
-            buyTokens(msg.sender);
-        }
-
-        // NOTE: Check if we bought enough amount to pledge
-        require(balances[msg.sender] >= _amount.mul(pledgePercentage).div(100));
-        pledges[msg.sender] = _amount;
-        pledgeTotal = pledgeTotal.sub(originalPledge).add(_amount);
     }
 
     /**
@@ -317,22 +290,65 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
     }
 
     /**
+     * @dev Pledges
+     * @param _addresses list of addresses
+     * @param _tokens List of tokens to drop
+     */
+    function pledge(address[] _addresses, uint256[] _tokens) external onlyOwnerOrOracle {
+        require(_addresses.length == _tokens.length);
+        _ensureTokensListAvailable(_tokens);
+
+        for (uint16 index = 0; index < _addresses.length; index++) {
+            pledgeTotal = pledgeTotal.sub(pledges[_addresses[index]]).add(_tokens[index]);
+            pledges[_addresses[index]] = _tokens[index];
+        }
+    }
+
+    /**
      * @dev Air drops tokens to users
      * @param _addresses list of addresses
      * @param _tokens List of tokens to drop
      */
     function airDropTokens(address[] _addresses, uint256[] _tokens) external onlyOwnerOrOracle {
         require(_addresses.length == _tokens.length);
+        _ensureTokensListAvailable(_tokens);
 
-        uint256 total;
         for (uint16 index = 0; index < _addresses.length; index++) {
+            balances[_addresses[index]] = balances[_addresses[index]].add(_tokens[index]);
+        }
+    }
+
+    /**
+     * @dev Ensure token list total is available
+     * @param _tokens list of tokens amount
+     */
+    function _ensureTokensListAvailable(uint256[] _tokens) internal {
+        uint256 total;
+        for (uint16 index = 0; index < _tokens.length; index++) {
             total = total.add(_tokens[index]);
         }
 
         _ensureTokensAvailable(total);
+    }
 
-        for (index = 0; index < _addresses.length; index++) {
-            balances[_addresses[index]] = balances[_addresses[index]].add(_tokens[index]);
+    /**
+     * @dev Ensure amount of tokens you would like to buy or pledge is available
+     * @param _tokens Amount of tokens to buy or pledge
+     */
+    function _ensureTokensAvailable(uint256 _tokens) internal view {
+        require(_tokens.add(_tokensLocked()) <= token.balanceOf(this));
+    }
+
+    /**
+     * @dev Returns locked or sold tokens based on stage
+     */
+    function _tokensLocked() internal view returns(uint256) {
+        uint256 locked = tokensSold;
+
+        if (pledgeOpen()) {
+            locked = locked.add(pledgeTotal);
         }
+
+        return locked;
     }
 }

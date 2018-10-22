@@ -7,17 +7,18 @@ function invest(web3, contract, from, ether) {
   });
 }
 
-function pledge(web3, contract, from, tokens, ether) {
-  return contract.pledge(tokens, {
-    from: from,
-    to: contract.address,
-    value: web3.toWei(ether, 'ether'),
-    gas: 2000000
-  });
-}
-
 async function weiRaised(crowdsale) {
   const wei = await crowdsale.weiRaised();
+  return wei.toNumber();
+}
+
+async function usdRaised(crowdsale) {
+  const wei = await crowdsale.usdRaised();
+  return wei.toNumber();
+}
+
+async function weiInvested(crowdsale, address) {
+  const wei = await crowdsale.weiInvested(address);
   return wei.toNumber();
 }
 
@@ -47,8 +48,9 @@ function now() {
 
 module.exports = {
   invest,
-  pledge,
   weiRaised,
+  usdRaised,
+  weiInvested,
   tokenCap,
   tokenBalanceOf,
   pledgeOf,

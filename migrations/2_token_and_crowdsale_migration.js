@@ -24,13 +24,12 @@ module.exports = function (deployer, network, accounts) {
     const secondsInDay = 60 * 60 * 24;
     const pledgeClosingTime = startTime + (secondsInDay * pledgeDurationInDays);
     const endTime = startTime + (secondsInDay * icoDurationInDays);
-    const pledgePercentage = 10;
 
     return deployer.deploy(AerumCrowdsale,
       AerumToken.address, wallet,
       whitelistedRate, publicRate,
       startTime, endTime,
-      pledgeClosingTime, pledgePercentage,
+      pledgeClosingTime,
       kycAmountInUsd, etherPriceInUsd
     );
   }
@@ -49,13 +48,12 @@ module.exports = function (deployer, network, accounts) {
     const secondsInDay = 60 * 60 * 24;
     const pledgeClosingTime = startTime + (secondsInDay * pledgeDurationInDays);
     const endTime = startTime + (secondsInDay * icoDurationInDays);
-    const pledgePercentage = 10;
 
     return deployer.deploy(AerumCrowdsale,
       AerumToken.address, wallet,
       whitelistedRate, publicRate,
       startTime, endTime,
-      pledgeClosingTime, pledgePercentage,
+      pledgeClosingTime,
       kycAmountInUsd, etherPriceInUsd
     );
   }

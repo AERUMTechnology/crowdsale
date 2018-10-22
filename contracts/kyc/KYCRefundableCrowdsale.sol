@@ -30,6 +30,7 @@ contract KYCRefundableCrowdsale is KYCCrowdsale {
      * @param _success Is goal reached or not
      */
     function setGoalReached(bool _success) external onlyOwner {
+        require(!isFinalized);
         goalReached = _success;
     }
 
@@ -61,6 +62,17 @@ contract KYCRefundableCrowdsale is KYCCrowdsale {
         isFinalized = true;
 
         emit Finalized();
+    }
+
+    /**
+     * @dev Override. Withdraw tokens only after crowdsale ends.
+     * Make sure crowdsale is successful & finalized
+     */
+    function withdrawTokens() public {
+        require(isFinalized);
+        require(goalReached);
+
+        super.withdrawTokens();
     }
 
     /**

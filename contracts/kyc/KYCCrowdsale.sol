@@ -13,10 +13,12 @@ contract KYCCrowdsale is Oraclized, PostDeliveryCrowdsale {
 
     /**
      * @dev etherPriceInUsd Ether price in cents
+     * @dev usdRaised Total USD raised while ICO in cents
      * @dev weiInvested Stores amount of wei invested by each user
      * @dev usdInvested Stores amount of USD invested by each user in cents
      */
     uint256 public etherPriceInUsd;
+    uint256 public usdRaised;
     mapping (address => uint256) public weiInvested;
     mapping (address => uint256) public usdInvested;
 
@@ -125,8 +127,10 @@ contract KYCCrowdsale is Oraclized, PostDeliveryCrowdsale {
     function _updatePurchasingState(address _beneficiary, uint256 _weiAmount) internal {
         super._updatePurchasingState(_beneficiary, _weiAmount);
 
+        uint256 usdAmount = _weiToUsd(_weiAmount);
+        usdRaised = usdRaised.add(usdAmount);
+        usdInvested[_beneficiary] = usdInvested[_beneficiary].add(usdAmount);
         weiInvested[_beneficiary] = weiInvested[_beneficiary].add(_weiAmount);
-        usdInvested[_beneficiary] = usdInvested[_beneficiary].add(_weiToUsd(_weiAmount));
 
         if (usdInvested[_beneficiary] >= KYCRequiredAmountInUsd) {
             KYCRequired[_beneficiary] = true;
@@ -139,6 +143,7 @@ contract KYCCrowdsale is Oraclized, PostDeliveryCrowdsale {
      */
     function withdrawTokens() public {
         require(isKYCSatisfied(msg.sender));
+
         super.withdrawTokens();
     }
 
@@ -148,5 +153,13 @@ contract KYCCrowdsale is Oraclized, PostDeliveryCrowdsale {
      */
     function _weiToUsd(uint256 _wei) internal view returns (uint256) {
         return _wei.mul(etherPriceInUsd).div(1e18);
+    }
+
+    /**
+     * @dev Converts cents to wei
+     * @param _cents Cents amount
+     */
+    function _usdToWei(uint256 _cents) internal view returns (uint256) {
+        return _cents.mul(1e18).div(etherPriceInUsd);
     }
 }
