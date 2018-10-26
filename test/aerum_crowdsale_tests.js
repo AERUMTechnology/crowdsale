@@ -259,13 +259,18 @@ contract('AerumCrowdsale', (accounts) => {
   });
 
   it("Should be able to airdrop tokens while & after ICO", async () => {
+    const drop1 = 60 * Math.pow(10, 18);
+    const drop2 = 10 * Math.pow(10, 18);
+    const tokensSoldBefore = await crowdsale.tokensSold();
     const tokensBeforeDrop1 = await utils.tokenBalanceOf(crowdsale, airDropCustomer1);
     const tokensBeforeDrop2 = await utils.tokenBalanceOf(crowdsale, airDropCustomer2);
-    await crowdsale.airDropTokens([airDropCustomer1, airDropCustomer2], [60, 10], {from: owner});
+    await crowdsale.airDropTokens([airDropCustomer1, airDropCustomer2], [drop1, drop2], {from: owner});
+    const tokensSoldAfter = await crowdsale.tokensSold();
     const tokensAfterDrop1 = await utils.tokenBalanceOf(crowdsale, airDropCustomer1);
     const tokensAfterDrop2 = await utils.tokenBalanceOf(crowdsale, airDropCustomer2);
-    assert.equal(tokensAfterDrop1, tokensBeforeDrop1 + 60);
-    assert.equal(tokensAfterDrop2, tokensBeforeDrop2 + 10);
+    assert.equal(tokensAfterDrop1, tokensBeforeDrop1 + drop1);
+    assert.equal(tokensAfterDrop2, tokensBeforeDrop2 + drop2);
+    assert.equal(tokensSoldAfter.toNumber(), tokensSoldBefore.toNumber() + drop1 + drop2);
   });
 
   it("Should be able to get funds after KYC is confirmed after finalization", async () => {

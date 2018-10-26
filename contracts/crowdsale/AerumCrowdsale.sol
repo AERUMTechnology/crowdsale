@@ -37,6 +37,7 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
     uint256 public publicRate;
 
 
+    event AirDrop(address indexed _account, uint256 _amount);
     event MinInvestmentUpdated(uint256 _cents);
     event RateUpdated(uint256 _whitelistedRate, uint256 _publicRate);
     event Withdraw(address indexed _account, uint256 _amount);
@@ -314,7 +315,10 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
         _ensureTokensListAvailable(_tokens);
 
         for (uint16 index = 0; index < _addresses.length; index++) {
+            tokensSold = tokensSold.add(_tokens[index]);
             balances[_addresses[index]] = balances[_addresses[index]].add(_tokens[index]);
+
+            emit AirDrop(_addresses[index], _tokens[index]);
         }
     }
 
