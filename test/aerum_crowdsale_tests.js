@@ -86,9 +86,10 @@ contract('AerumCrowdsale', (accounts) => {
     try {
       const tokensSold = await crowdsale.tokensSold();
       const pledgeTotal = await crowdsale.pledgeTotal();
+      const customerPledge = await utils.pledgeOf(crowdsale, pledgeCustomer1);
       const tokenBalance = await token.balanceOf(crowdsale.address);
       // NOTE: Try to buy more than allowed (more than left)
-      const maxInvestmentPossible = (tokenBalance.toNumber() - (tokensSold.toNumber() + pledgeTotal.toNumber())) / (whitelistedRate * Math.pow(10, 18));
+      const maxInvestmentPossible = (tokenBalance.toNumber() - (tokensSold.toNumber() + pledgeTotal.toNumber()) + customerPledge) / (whitelistedRate * Math.pow(10, 18));
       const notAllowedInvestment = maxInvestmentPossible + 1;
       const etherBalance = web3.fromWei(await web3.eth.getBalance(pledgeCustomer1), 'ether');
       assert.isTrue(notAllowedInvestment <= etherBalance.toNumber());
@@ -317,8 +318,9 @@ contract('AerumCrowdsale', (accounts) => {
     await utils.invest(web3, failedCrowdsale, multiPayingCustomer, 1);
     assert.isTrue(await utils.tokenBalanceOf(failedCrowdsale, failedCrowdsaleCustomer) > 0);
     assert.isTrue(!await failedCrowdsale.goalReached());
-    const initBalance = await web3.eth.getBalance(failedCrowdsaleCustomer);
     assert.equal(web3.fromWei(await web3.eth.getBalance(failedCrowdsale.address), 'ether').toNumber(), 2);
+    const initBalance1 = await web3.eth.getBalance(failedCrowdsaleCustomer);
+    const initBalance2 = await web3.eth.getBalance(multiPayingCustomer);
 
     // owner takes 50% of funds
     await failedCrowdsale.ownerWithdraw(web3.toWei(1, 'ether'), {from: owner});
@@ -333,12 +335,19 @@ contract('AerumCrowdsale', (accounts) => {
     assert.isTrue(await failedCrowdsale.hasClosed());
     assert.isTrue(await failedCrowdsale.isFinalized());
 
-    // refund
+    // refund one customer
     await failedCrowdsale.claimRefund({from: failedCrowdsaleCustomer});
-    const finalBalance = await web3.eth.getBalance(failedCrowdsaleCustomer);
-    const difference = web3.fromWei(finalBalance.toNumber() - initBalance.toNumber(), 'ether');
+    const finalBalance1 = await web3.eth.getBalance(failedCrowdsaleCustomer);
+    const difference1 = web3.fromWei(finalBalance1.toNumber() - initBalance1.toNumber(), 'ether');
     // NOTE: Key thing here we get only ~0.5 ETH here back
-    assert.isTrue(0.45 <= difference && difference <= 0.5);
+    assert.isTrue(0.49 <= difference1 && difference1 <= 0.5);
+
+    // refund second customer
+    await failedCrowdsale.claimRefund({from: multiPayingCustomer});
+    const finalBalance2 = await web3.eth.getBalance(multiPayingCustomer);
+    const difference2 = web3.fromWei(finalBalance2.toNumber() - initBalance2.toNumber(), 'ether');
+    // NOTE: Key thing here we get only ~0.5 ETH here back
+    assert.isTrue(0.49 <= difference2 && difference2 <= 0.5);
   });
 
   it("Should NOT be able to invest after closingTime", async () => {

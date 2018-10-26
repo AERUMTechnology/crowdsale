@@ -11,8 +11,10 @@ contract KYCRefundableCrowdsale is KYCCrowdsale {
 
     /**
      * @dev percentage multiplier to present percentage as decimals. 5 decimal by default
+     * @dev weiOnFinalize ether balance which was on finalize & will be returned to users in case of failed crowdsale
      */
     uint256 private percentage = 100 * 1000;
+    uint256 private weiOnFinalize;
 
     /**
      * @dev goalReached specifies if crowdsale goal is reached
@@ -59,6 +61,7 @@ contract KYCRefundableCrowdsale is KYCCrowdsale {
 
         // NOTE: We do this because we would like to allow withdrawals earlier than closing time in case of crowdsale success
         closingTime = block.timestamp;
+        weiOnFinalize = address(this).balance;
         isFinalized = true;
 
         emit Finalized();
@@ -98,6 +101,6 @@ contract KYCRefundableCrowdsale is KYCCrowdsale {
      * @dev Calculates refund percentage in case some funds will be used by dev team on crowdsale needs
      */
     function _refundPercentage() internal view returns (uint256) {
-        return address(this).balance.mul(percentage).div(weiRaised);
+        return weiOnFinalize.mul(percentage).div(weiRaised);
     }
 }

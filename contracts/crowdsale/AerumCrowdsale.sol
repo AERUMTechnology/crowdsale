@@ -1,4 +1,4 @@
-pragma solidity 0.4.24;
+pragma solidity ^0.4.24;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "openzeppelin-solidity/contracts/token/ERC20/ERC20.sol";
@@ -173,7 +173,7 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
     /**
      * @dev Returns remaining tokens based on stage
      */
-    function tokensRemaining() public view returns(uint256) {
+    function tokensRemaining() external view returns(uint256) {
         return token.balanceOf(this).sub(_tokensLocked());
     }
 
@@ -198,7 +198,7 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
         super._preValidatePurchase(_beneficiary, _weiAmount);
 
         require(_totalInvestmentInUsd(_beneficiary, _weiAmount) >= minInvestmentInUsd);
-        _ensureTokensAvailable(_getTokenAmount(_weiAmount));
+        _ensureTokensAvailableExcludingPledge(_beneficiary, _getTokenAmount(_weiAmount));
     }
 
     /**
@@ -340,6 +340,15 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
     }
 
     /**
+     * @dev Ensure amount of tokens you would like to buy or pledge is available excluding pledged for account
+     * @param _account Account which is checked for pledge
+     * @param _tokens Amount of tokens to buy or pledge
+     */
+    function _ensureTokensAvailableExcludingPledge(address _account, uint256 _tokens) internal view {
+        require(_tokens.add(_tokensLockedExcludingPledge(_account)) <= token.balanceOf(this));
+    }
+
+    /**
      * @dev Returns locked or sold tokens based on stage
      */
     function _tokensLocked() internal view returns(uint256) {
@@ -347,6 +356,20 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
 
         if (pledgeOpen()) {
             locked = locked.add(pledgeTotal);
+        }
+
+        return locked;
+    }
+
+    /**
+     * @dev Returns locked or sold tokens based on stage excluding pledged for account
+     * @param _account Account which is checked for pledge
+     */
+    function _tokensLockedExcludingPledge(address _account) internal view returns(uint256) {
+        uint256 locked = _tokensLocked();
+
+        if (pledgeOpen()) {
+            locked = locked.sub(pledgeOf(_account));
         }
 
         return locked;
