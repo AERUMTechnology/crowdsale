@@ -233,8 +233,10 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
      */
     function _decreasePledge(address _beneficiary, uint256 _tokenAmount) internal {
         if (pledgeOf(_beneficiary) <= _tokenAmount) {
+            pledgeTotal = pledgeTotal.sub(pledgeOf(_beneficiary));
             pledges[_beneficiary] = 0;
         } else {
+            pledgeTotal = pledgeTotal.sub(_tokenAmount);
             pledges[_beneficiary] = pledges[_beneficiary].sub(_tokenAmount);
         }
     }

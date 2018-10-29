@@ -17,6 +17,11 @@ async function usdRaised(crowdsale) {
   return wei.toNumber();
 }
 
+async function pledgeTotal(crowdsale) {
+  const tokens = await crowdsale.pledgeTotal();
+  return tokens.toNumber();
+}
+
 async function weiInvested(crowdsale, address) {
   const wei = await crowdsale.weiInvested(address);
   return wei.toNumber();
@@ -54,6 +59,7 @@ module.exports = {
   tokenCap,
   tokenBalanceOf,
   pledgeOf,
+  pledgeTotal,
   isKYCRequired,
   now
 };

@@ -49,9 +49,12 @@ contract('AerumCrowdsale', (accounts) => {
   it("Should be able to pledge tokens by owner", async () => {
     const pledge1 = 2000 * Math.pow(10, 18);
     const pledge2 = 1000 * Math.pow(10, 18);
+    const pledgeTotalBefore = await utils.pledgeTotal(crowdsale);
     await crowdsale.pledge([pledgeCustomer1, pledgeCustomer2], [pledge1, pledge2], {from: owner});
+    const pledgeTotalAfter = await utils.pledgeTotal(crowdsale);
     assert.equal(await crowdsale.pledgeOf(pledgeCustomer1), pledge1);
     assert.equal(await crowdsale.pledgeOf(pledgeCustomer2), pledge2);
+    assert.equal(pledgeTotalAfter, pledgeTotalBefore + pledge1 + pledge2)
   });
 
   it("Should be able to change pledge", async () => {
@@ -85,11 +88,11 @@ contract('AerumCrowdsale', (accounts) => {
   it("Should NOT be able to buy more tokens than remaining of pledged & sold", async () => {
     try {
       const tokensSold = await crowdsale.tokensSold();
-      const pledgeTotal = await crowdsale.pledgeTotal();
+      const pledgeTotal = await utils.pledgeTotal(crowdsale);
       const customerPledge = await utils.pledgeOf(crowdsale, pledgeCustomer1);
       const tokenBalance = await token.balanceOf(crowdsale.address);
       // NOTE: Try to buy more than allowed (more than left)
-      const maxInvestmentPossible = (tokenBalance.toNumber() - (tokensSold.toNumber() + pledgeTotal.toNumber()) + customerPledge) / (whitelistedRate * Math.pow(10, 18));
+      const maxInvestmentPossible = (tokenBalance.toNumber() - (tokensSold.toNumber() + pledgeTotal) + customerPledge) / (whitelistedRate * Math.pow(10, 18));
       const notAllowedInvestment = maxInvestmentPossible + 1;
       const etherBalance = web3.fromWei(await web3.eth.getBalance(pledgeCustomer1), 'ether');
       assert.isTrue(notAllowedInvestment <= etherBalance.toNumber());
@@ -100,6 +103,29 @@ contract('AerumCrowdsale', (accounts) => {
       assert.equal(await utils.pledgeOf(crowdsale, pledgeCustomer1), previousPledge);
       assert.equal(await utils.tokenBalanceOf(crowdsale, pledgeCustomer1), 0);
     }
+  });
+
+  it("Should decrease pledge amounts when buying tokens while whitelisted period", async () => {
+    // NOTE: We will buy 600 XRM with 3 ETH
+    const investment = 3;
+    const expectedTokensBought = 600 * Math.pow(10, 18);
+    const pledgeTotalBefore = await utils.pledgeTotal(crowdsale);
+    const customerPledgeBefore = await utils.pledgeOf(crowdsale, pledgeCustomer1);
+    assert.equal(customerPledgeBefore, 1000 * Math.pow(10, 18));
+
+    // NOTE: Here we invest before pledge
+    await utils.invest(web3, crowdsale, pledgeCustomer1, investment);
+    const pledgeTotalMiddle = await utils.pledgeTotal(crowdsale);
+    const customerPledgeMiddle = await utils.pledgeOf(crowdsale, pledgeCustomer1);
+    assert.equal(customerPledgeMiddle, customerPledgeBefore - expectedTokensBought);
+    assert.equal(pledgeTotalMiddle, pledgeTotalBefore - expectedTokensBought);
+
+    // NOTE: Here we invest over pledge
+    await utils.invest(web3, crowdsale, pledgeCustomer1, investment);
+    const pledgeTotalAfter = await utils.pledgeTotal(crowdsale);
+    const customerPledgeAfter = await utils.pledgeOf(crowdsale, pledgeCustomer1);
+    assert.equal(customerPledgeAfter, 0);
+    assert.equal(pledgeTotalAfter, pledgeTotalMiddle - 400 * Math.pow(10, 18));
   });
 
   it("Should be able to switch to public round", async () => {
@@ -120,6 +146,8 @@ contract('AerumCrowdsale', (accounts) => {
     assert.equal(await utils.usdRaised(crowdsale), usdRaisedBefore + investment * etherPriceInUsd);
     assert.equal(await utils.tokenBalanceOf(crowdsale, notKYCCustomer), investment * rate * Math.pow(10, 18));
     assert.equal(await utils.isKYCRequired(crowdsale, notKYCCustomer), false);
+    const tokenBalance = await token.balanceOf(notKYCCustomer);
+    assert.equal(tokenBalance.toNumber(), 0);
   });
 
   it("Should be able to invest with KYC required", async () => {
