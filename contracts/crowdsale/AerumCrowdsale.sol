@@ -358,7 +358,7 @@ contract AerumCrowdsale is KYCRefundableCrowdsale {
      * @dev Returns locked or sold tokens based on stage
      */
     function _tokensLocked() internal view returns(uint256) {
-        uint256 locked = tokensSold;
+        uint256 locked = tokensSold.sub(tokensWithdrawn);
 
         if (pledgeOpen()) {
             locked = locked.add(pledgeTotal);

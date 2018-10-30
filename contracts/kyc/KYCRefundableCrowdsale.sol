@@ -19,9 +19,11 @@ contract KYCRefundableCrowdsale is KYCCrowdsale {
     /**
      * @dev goalReached specifies if crowdsale goal is reached
      * @dev isFinalized is crowdsale finished
+     * @dev tokensWithdrawn total amount of tokens already withdrawn
      */
     bool public goalReached = false;
     bool public isFinalized = false;
+    uint256 public tokensWithdrawn;
 
     event Refund(address indexed _account, uint256 _amountInvested, uint256 _amountRefunded);
     event Finalized();
@@ -74,6 +76,8 @@ contract KYCRefundableCrowdsale is KYCCrowdsale {
     function withdrawTokens() public {
         require(isFinalized);
         require(goalReached);
+
+        tokensWithdrawn = tokensWithdrawn.add(balances[msg.sender]);
 
         super.withdrawTokens();
     }

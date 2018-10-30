@@ -417,6 +417,40 @@ contract('AerumCrowdsale', (accounts) => {
     }
   });
 
+  it("Should be able to withdraw remaining tokens by owner after use withdraw", async () => {
+    // deploy
+    const finalizeCrowdsale = await deployCrowdsale();
+
+    // invest
+    const investment = 1;
+    const tokenBalanceBefore = await token.balanceOf(notKYCCustomer);
+    await utils.invest(web3, finalizeCrowdsale, notKYCCustomer, investment);
+
+    await finalizeCrowdsale.setGoalReached(true, {from: owner});
+    await finalizeCrowdsale.finalize({from: owner});
+
+    // NOTE: Wait till crowdsale is finalized
+    await timeout(1000);
+
+    assert.isTrue(await finalizeCrowdsale.hasClosed());
+    assert.isTrue(await finalizeCrowdsale.isFinalized());
+
+    // customer withdraw
+    await finalizeCrowdsale.withdrawTokens({from: notKYCCustomer});
+    const tokenBalanceAfter = await token.balanceOf(notKYCCustomer);
+    assert.equal(tokenBalanceAfter.toNumber(), tokenBalanceBefore.toNumber() + investment * whitelistedRate * Math.pow(10, 18));
+
+    // owner withdraw (7800 remaining)
+    const remainingBalance = 7800 * Math.pow(10, 18);
+    const ownerBalanceBefore = await token.balanceOf(owner);
+    await finalizeCrowdsale.sendTokens(owner, remainingBalance, {from: owner});
+    const ownerBalanceAfter = await token.balanceOf(owner);
+    assert.equal(ownerBalanceAfter.toNumber(), ownerBalanceBefore.toNumber() + remainingBalance);
+
+    const crowdsaleBalance = await token.balanceOf(finalizeCrowdsale.address);
+    assert.equal(crowdsaleBalance.toNumber(), 0);
+  });
+
   async function deployCrowdsale(config) {
     config = config || {};
     const aerumCrowdsale = await AerumCrowdsale.new(
